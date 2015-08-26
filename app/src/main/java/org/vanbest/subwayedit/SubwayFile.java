@@ -5,8 +5,12 @@ import android.util.Log;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.charset.Charset;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -30,9 +34,14 @@ import java.util.Map;
 public class SubwayFile {
     private String filename;
     private List<Entry> entries = null;
+    private List<NumberEntry> firstNumberEntries = null;
+    private List<NumberEntry> secondNumberEntries = null;
+
+    private int fileVersion;
+
     //unsigned char toprun_salt[] = { 0x47, 0x68, 0x67, 0x74, 0x72, 0x52, 0x46, 0x52, 0x66, 0x50, 0x4C, 0x4A, 0x68, 0x46, 0x44, 0x73, 0x57, 0x65, 0x23, 0x64, 0x45, 0x64, 0x72, 0x74, 0x35, 0x72, 0x66, 0x67, 0x35, 0x36 };
     //unsigned char onlinesettings_salt[] = { 0x70, 0x64, 0x76, 0x73, 0x68, 0x62, 0x68, 0x6B, 0x6E, 0x64, 0x66, 0x39, 0x32, 0x6B, 0x31, 0x39, 0x7A, 0x76, 0x62, 0x63, 0x6B, 0x61, 0x77, 0x64, 0x39, 0x32, 0x66, 0x6A, 0x6B };
-    //unsigned char playerinfo_salt[] = { 0x77, 0x65, 0x31, 0x32, 0x72, 0x74, 0x79, 0x75, 0x69, 0x6B, 0x6C, 0x68, 0x67, 0x66, 0x64, 0x6A, 0x65, 0x72, 0x4B, 0x4A, 0x47, 0x48, 0x66, 0x76, 0x67, 0x68, 0x79, 0x75, 0x68, 0x6E, 0x6A, 0x69, 0x6F, 0x6B, 0x4C, 0x4A, 0x48, 0x6C, 0x31, 0x34, 0x35, 0x72, 0x74, 0x79, 0x66, 0x67, 0x68, 0x6A, 0x76, 0x62, 0x6E };
+    private static byte[] playerinfo_salt = { 0x77, 0x65, 0x31, 0x32, 0x72, 0x74, 0x79, 0x75, 0x69, 0x6B, 0x6C, 0x68, 0x67, 0x66, 0x64, 0x6A, 0x65, 0x72, 0x4B, 0x4A, 0x47, 0x48, 0x66, 0x76, 0x67, 0x68, 0x79, 0x75, 0x68, 0x6E, 0x6A, 0x69, 0x6F, 0x6B, 0x4C, 0x4A, 0x48, 0x6C, 0x31, 0x34, 0x35, 0x72, 0x74, 0x79, 0x66, 0x67, 0x68, 0x6A, 0x76, 0x62, 0x6E };
 
     private class Entry
     {
@@ -43,13 +52,23 @@ public class SubwayFile {
             this.value = value;
         }
     }
+    private class NumberEntry
+    {
+        String key;
+        int value;
+        public NumberEntry(String key, int value) {
+            this.key =key;
+            this.value = value;
+        }
+    }
+
 
     private int readDword(BufferedInputStream in) throws IOException
     {
-        return in.read() + in.read() * (1>>8) + in.read() * (1>>16) + in.read() * (1>>24);
+        return in.read() + in.read() * (1<<8) + in.read() * (1<<16) + in.read() * (1<<24);
     }
 
-    private void writeDword(BufferedOutputStream out, int dword) throws IOException
+    private void writeDword(RandomAccessFile out, int dword) throws IOException
     {
         out.write(dword & 0x000000ff);
         out.write((dword & 0x0000ff00) >> 8);
@@ -68,15 +87,15 @@ public class SubwayFile {
         return new String(chars, "ASCII");
     }
 
-    private void writeString(BufferedOutputStream out, String s) throws IOException
+    private void writeString(RandomAccessFile out, String s) throws IOException
     {
         byte[] bytes = s.getBytes("ASCII");
         int count = bytes.length;
         if (count < 0x80) {
             out.write(count);
         } else {
-            out.write(count & 0x7f + 0x80);
-            out.write(count << 7);
+            out.write((count & 0x7f) + 0x80);
+            out.write(count >> 7);
         }
         out.write(bytes);
     }
@@ -92,7 +111,7 @@ public class SubwayFile {
 
         int fileSize = readDword(in);
         Log.d("SubwayFile", "File size: " + fileSize);
-        int fileVersion = readDword(in);
+        fileVersion = readDword(in);
         Log.d("SubwayFile", "file version: " + fileVersion);
 
         int numStrings = readDword(in);
@@ -108,7 +127,7 @@ public class SubwayFile {
         for(int i=0; i<numNumbers && in.available()>0; i++) {
             String key = readString(in);
             int value = readDword(in);
-            //entries.add(new Entry(key, value));
+            firstNumberEntries.add(new NumberEntry(key, value));
             Log.d("SubwayFile", "Read number " + key + ": " + value);
         }
         numNumbers = readDword(in);
@@ -116,21 +135,91 @@ public class SubwayFile {
         for(int i=0; i<numNumbers && in.available()>0; i++) {
             String key = readString(in);
             int value = readDword(in);
-            //entries.add(new Entry(key, value));
+            secondNumberEntries.add(new NumberEntry(key, value));
             Log.d("SubwayFile", "Read number " + key + ": " + value);
         }
+    }
+
+    protected void writeFile(String filename) throws IOException
+    {
+        RandomAccessFile out = new RandomAccessFile(filename, "rw");
+
+        MessageDigest SHA1;
+        try {
+            SHA1 = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            return;
+        }
+        SHA1.reset();
+
+        int hashSize = SHA1.getDigestLength();
+        writeDword(out, hashSize);
+        Log.d("SubwayFile", "Hash size: " + hashSize);
+
+        long hashOffset = out.getFilePointer();
+        // For now, write empty hash
+        for(int i=0; i<hashSize; i++) out.write(0);
+
+        //For now, write empty file size
+        long sizeOffset = out.getFilePointer();
+        writeDword(out, 0);
+
+        long hashStartOffset = out.getFilePointer();
+
+        writeDword(out, fileVersion);
+        Log.d("SubwayFile", "file version: " + fileVersion);
+
+        int numStrings = entries.size();
+        writeDword(out, numStrings);
+        Log.d("SubwayFile", "numStrings: " + numStrings);
+        for(Entry entry: entries) {
+            writeString(out, entry.key);
+            writeString(out, entry.value);
+        }
+
+        int numNumbers = firstNumberEntries.size();
+        writeDword(out, numNumbers);
+        for(NumberEntry entry: firstNumberEntries) {
+            writeString(out, entry.key);
+            writeDword(out, entry.value);
+        }
+        numNumbers = secondNumberEntries.size();
+        writeDword(out, numNumbers);
+        for(NumberEntry entry: secondNumberEntries) {
+            writeString(out, entry.key);
+            writeDword(out, entry.value);
+        }
+
+        int fileSize = (int) (out.getFilePointer() - hashStartOffset);
+        out.seek(sizeOffset);
+        writeDword(out, fileSize);
+
+        byte[] data = new byte[(int) fileSize];
+        out.seek(hashStartOffset);
+        out.read(data);
+        SHA1.update(playerinfo_salt);
+        SHA1.update(data);
+
+        out.seek(hashOffset);
+        out.write(SHA1.digest());
+
+        out.close();
     }
 
     public SubwayFile()
     {
         this.filename = "none";
         entries = new ArrayList<Entry>();
+        firstNumberEntries = new ArrayList<>();
+        secondNumberEntries = new ArrayList<>();
     }
 
     public SubwayFile(String filename) throws IOException
     {
         this.filename = filename;
         entries = new ArrayList<Entry>();
+        firstNumberEntries = new ArrayList<>();
+        secondNumberEntries = new ArrayList<>();
         readFile(filename);
     }
 
