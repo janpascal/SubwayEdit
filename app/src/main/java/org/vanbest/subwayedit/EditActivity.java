@@ -19,7 +19,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,15 +37,19 @@ public class EditActivity extends AppCompatActivity {
     private String localFilename;
     private SubwayFile file;
     private String fileOwnerInfo = null;
+    private Map<Integer,EditText> views;
 
     private class StartUp extends AsyncTask<String, String, String> {
 
         @Override
+        protected void onPreExecute() {
+            Button saveButton = (Button) findViewById(R.id.edit_save_button);
+            saveButton.setEnabled(false);
+        }
+        @Override
         protected String doInBackground(String... params) {
             file = null;
             publishProgress("Please wait...");
-            //Button saveButton = (Button) findViewById(R.id.edit_save_button);
-            //saveButton.setEnabled(False);
             try {
                 file = new SubwayFile(filename);
             } catch (IOException e) {
@@ -96,8 +102,6 @@ public class EditActivity extends AppCompatActivity {
                 } else {
                     Log.d("SubwayFile", "No root available");
                 }
-
-
             }
 
             publishProgress("Preparing display...");
@@ -110,24 +114,6 @@ public class EditActivity extends AppCompatActivity {
             Toast.makeText(context, result[0], Toast.LENGTH_SHORT).show();
         }
 
-        class MyEditorActionListener implements TextView.OnEditorActionListener
-        {
-            private SubwayFile file;
-            private int number;
-            MyEditorActionListener(SubwayFile f, int number) {
-                this.file = f;
-                this.number = number;
-            }
-            @Override
-            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
-                if (actionId == EditorInfo.IME_NULL) {
-                    file.setValue(number, v.getText().toString());
-                    Log.d("SubwayEdit", "Setting field " + file.getKey(number) + " to " + file.getValue(number));
-                }
-                return false;
-            }
-        }
-
         @Override
         protected void onPostExecute(String s) {
             super.onPostExecute(s);
@@ -136,6 +122,8 @@ public class EditActivity extends AppCompatActivity {
 
             if ( file != null ) {
                 Log.d("SubwayEdit", "Creating edit fields...");
+
+                views = new HashMap<>();
                 for (int i=0; i<file.getSize(); i++) {
                     TableRow row = new TableRow(context);
 
@@ -148,38 +136,66 @@ public class EditActivity extends AppCompatActivity {
                     edit.setText(file.getValue(i));
                     edit.setLines(1);
                     edit.setSingleLine();
-                    edit.setOnEditorActionListener(new MyEditorActionListener(file, i));
                     row.addView(edit);
+
+                    views.put(i, edit);
 
                     table.addView(row);
                 }
             }
             Log.d("SubwayEdit", "Done creating edit fields");
 
+            Button saveButton = (Button) findViewById(R.id.edit_save_button);
+            saveButton.setEnabled(true);
+        }
+    }
+
+    private class SaveSettings extends AsyncTask<String, String, String> {
+        @Override
+        protected String doInBackground(String... params) {
+            //file.setValue(0, "123456");
+            if (file == null) return null;
+
+            try {
+                file.writeFile(localFilename);
+            } catch (IOException ex) {
+                Log.d("SubwayMainAct", "Error writing to local file", ex);
+                return null;
+            }
+
+            boolean suAvailable = Shell.SU.available();
+            List<String> suResult2 = Shell.SU.run(new String[]{
+                    "cp " + localFilename + " " + filename,
+                    "ls -l " + filename,
+                    "chmod 0600 " + filename,
+                    fileOwnerInfo == null ? "echo no" : "chown " + fileOwnerInfo + " " + filename,
+                    "ls -l " + filename
+            });
+            Log.d("SubwayFile", "Su result copying back: ");
+            for (String s : suResult2) {
+                Log.d("SubwayFile", s);
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            TableLayout table = (TableLayout) findViewById(R.id.tableLayout);
+            Context context = table.getContext();
+            Toast.makeText(context, "Settings saved", Toast.LENGTH_SHORT).show();
         }
     }
 
     public void saveSettings(View view) {
-        //file.setValue(0, "123456");
-        try {
-            file.writeFile(localFilename);
-        } catch (IOException ex) {
-            Log.d("SubwayMainAct", "Error writing to local file", ex);
-            return;
-        }
 
-        boolean suAvailable = Shell.SU.available();
-        List<String> suResult2 = Shell.SU.run(new String[] {
-                "cp " + localFilename + " " + filename,
-                "ls -l " + filename,
-                "chmod 0600 " + filename,
-                fileOwnerInfo == null ? "echo no" : "chown " + fileOwnerInfo + " " + filename,
-                "ls -l " + filename
-        });
-        Log.d("SubwayFile", "Su result copying back: ");
-        for(String s: suResult2) {
-            Log.d("SubwayFile", s);
+        if (views != null) {
+            for (int i: views.keySet()) {
+                file.setValue(i, views.get(i).getText().toString());
+            }
         }
+        new SaveSettings().execute();
+
+        this.finish();
     }
 
     @Override
