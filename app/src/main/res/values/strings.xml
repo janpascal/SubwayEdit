@@ -3,4 +3,6 @@
 
     <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
+    <string name="title_activity_main">SubwayEdit</string>
+    <string name="main_text">Please select how to edit your settings file</string>
 </resources>
