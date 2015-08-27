@@ -28,11 +28,27 @@ import java.util.Map;
  * 0018   0004 Length of rest of file (filesize - 0x001C)
  * 001C   0004 0x0001 (maybe file version?)
  * 0020   0004 Number of key/value strings
+ *        1-2  Length of first key
+ *             Characters of first key
+ *        1-2  Length of first value
+ *             Characters of second value
+ *
+ *        1-2  Length of second key
+ *        (etc)
  * ...
  *        0004 Number of key/number pairs
+ *        1-2  Length of first key
+ *             Characters of first key
+ *        0004 First value (32-bit value)
  * ...
  *        0004 Number of key/number pairs (second set)
  * ....
+ *
+ * All 4-byte numbers are high-endian (least significant byte first)
+ *
+ * All string length fields are as follows.
+ * If the length is less than 128 (0x80) bytes, only a one byte length field is used.
+ * Else, the first byte is (length XOR 0x7f) + 0x80. The second byte is the length divided by 0x80.
  */
 public class SubwayFile {
     private String filename;
