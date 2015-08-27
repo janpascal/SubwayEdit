@@ -1,0 +1,36 @@
+# SubwayEdit
+Tool to edit Subway Surfers data files. You can change the number of coins, number of keys, of boards, etc. You can 
+probably also completely ruin the settings file by editing some of the more obscure settings. 
+
+Root access required.
+
+# File format of playerdata file:
+ Offset Size Content
+ 0000   0004 Hash size (0x0014)
+ 0004   0014 SHA1 hash of salt + file after offset 0x001C
+ 0018   0004 Length of rest of file (filesize - 0x001C)
+ 001C   0004 0x0001 (maybe file version?)
+ 0020   0004 Number of key/value strings
+        1-2  Length of first key
+             Characters of first key
+        1-2  Length of first value
+             Characters of second value
+ 
+        1-2  Length of second key
+        (etc)
+ ...
+        0004 Number of key/number pairs
+        1-2  Length of first key
+             Characters of first key
+        0004 First value (32-bit value)
+        1-2  Length of second key
+        (etc)
+ ...
+        0004 Number of key/number pairs (second set)
+        (etc)
+ ....
+ 
+All 4-byte numbers are high-endian (least significant byte first)
+All string length fields are as follows.
+If the length is less than 128 (0x80) bytes, only a one byte length field is used.
+Else, the first byte is (length XOR 0x7f) + 0x80. The second byte is the length divided by 0x80.
