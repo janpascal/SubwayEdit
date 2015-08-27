@@ -2,6 +2,8 @@
 Tool to edit Subway Surfers data files. You can change the number of coins, number of keys, of boards, etc. You can 
 probably also completely ruin the settings file by editing some of the more obscure settings. 
 
+And yes, this is cheating.
+
 Root access required.
 
 # File format of playerdata file:
