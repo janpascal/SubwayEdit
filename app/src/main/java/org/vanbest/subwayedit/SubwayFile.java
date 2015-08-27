@@ -240,4 +240,32 @@ public class SubwayFile {
     public int getSize() {
         return entries.size();
     }
+
+    public String getNumbers1Key(int i) {
+        return firstNumberEntries.get(i).key;
+    }
+    public int getNumbers1Value(int i) {
+        return firstNumberEntries.get(i).value;
+    }
+    public void setNumbers1Value(int i, int value) {
+        firstNumberEntries.get(i).value = value;
+    }
+    public int getNumbers1Size() {
+        return firstNumberEntries.size();
+    }
+
+    public String getNumbers2Key(int i) {
+        return secondNumberEntries.get(i).key;
+    }
+    public int getNumbers2Value(int i) {
+        return secondNumberEntries.get(i).value;
+    }
+    public void setNumbers2Value(int i, int value) {
+        secondNumberEntries.get(i).value = value;
+    }
+    public int getNumbers2Size() {
+        return secondNumberEntries.size();
+    }
+
+
 }

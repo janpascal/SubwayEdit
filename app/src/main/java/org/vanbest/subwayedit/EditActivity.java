@@ -38,6 +38,8 @@ public class EditActivity extends AppCompatActivity {
     private SubwayFile file;
     private String fileOwnerInfo = null;
     private Map<Integer,EditText> views;
+    private Map<Integer,EditText> numbers1_views;
+    private Map<Integer,EditText> numbers2_views;
 
     private class StartUp extends AsyncTask<String, String, String> {
 
@@ -49,59 +51,53 @@ public class EditActivity extends AppCompatActivity {
         @Override
         protected String doInBackground(String... params) {
             file = null;
-            publishProgress("Please wait...");
+            // publishProgress("Please wait...");
+            Log.d("SubwayFile", "Data file:" + localFilename);
+
+            publishProgress("Getting root access...");
             try {
-                file = new SubwayFile(filename);
-            } catch (IOException e) {
-                Log.d("SubwayFile", e.toString());
+                Process process = Runtime.getRuntime().exec(new String[]{"su", "-c", "ls " + filename });
+                process.waitFor();
+            } catch (IOException e3) {
+                Log.d("SubwayFile", "IOException running su manually", e3);
+            } catch (InterruptedException e4) {
+                Log.d("SubwayFile", e4.toString());
+            }
+            Log.d("SubwayFile", "B");
 
-                Log.d("SubwayFile", "Data file:" + localFilename);
-
-                publishProgress("Getting root access...");
+            boolean suAvailable = Shell.SU.available();
+            if (suAvailable) {
+                // suVersion = Shell.SU.version(false);
+                // suVersionInternal = Shell.SU.version(true);
+                // publishProgress("Copying file...");
+                List<String> suResult = Shell.SU.run(new String[] {
+                        "cp " + filename + " " + localFilename,
+                        "chmod 0666 " + localFilename,
+                        "ls -ln " + filename
+                });
+                Log.d("SubwayFile", "Su result: ");
+                for(String s: suResult) {
+                    Log.d("SubwayFile", s);
+                }
+                if (suResult.size()>0) {
+                    Log.d("SubwayFile", "String to match: [" + suResult.get(0) + "]");
+                    Pattern p = Pattern.compile("^\\S*\\s*(\\d+)\\s+(\\d+)\\s+.*");
+                    Matcher m = p.matcher(suResult.get(0));
+                    if (m.matches()) {
+                        Log.d("SubwayFile", "Matched owner:group is " + m.group(1) + ":" + m.group(2));
+                        fileOwnerInfo = m.group(1) + ":" + m.group(2);
+                    } else {
+                        Log.d("SubwayFile", "No match");
+                    }
+                }
+                publishProgress("Parsing settings file...");
                 try {
-                    Process process = Runtime.getRuntime().exec(new String[]{"su", "-c", "ls " + filename });
-                    process.waitFor();
-                } catch (IOException e3) {
-                    Log.d("SubwayFile", "IOException running su manually", e3);
-                } catch (InterruptedException e4) {
-                    Log.d("SubwayFile", e4.toString());
+                    file = new SubwayFile(localFilename);
+                } catch (IOException e2) {
+                    Log.d("SubwayFile", e2.toString());
                 }
-                Log.d("SubwayFile", "B");
-
-                boolean suAvailable = Shell.SU.available();
-                if (suAvailable) {
-                    // suVersion = Shell.SU.version(false);
-                    // suVersionInternal = Shell.SU.version(true);
-                    publishProgress("Copying file...");
-                    List<String> suResult = Shell.SU.run(new String[] {
-                            "cp " + filename + " " + localFilename,
-                            "chmod 0666 " + localFilename,
-                            "ls -ln " + filename
-                    });
-                    Log.d("SubwayFile", "Su result: ");
-                    for(String s: suResult) {
-                        Log.d("SubwayFile", s);
-                    }
-                    if (suResult.size()>0) {
-                        Log.d("SubwayFile", "String to match: [" + suResult.get(0) + "]");
-                        Pattern p = Pattern.compile("^\\S*\\s*(\\d+)\\s+(\\d+)\\s+.*");
-                        Matcher m = p.matcher(suResult.get(0));
-                        if (m.matches()) {
-                            Log.d("SubwayFile", "Matched owner:group is " + m.group(1) + ":" + m.group(2));
-                            fileOwnerInfo = m.group(1) + ":" + m.group(2);
-                        } else {
-                            Log.d("SubwayFile", "No match");
-                        }
-                    }
-                    publishProgress("Parsing setting file...");
-                    try {
-                        file = new SubwayFile(localFilename);
-                    } catch (IOException e2) {
-                        Log.d("SubwayFile", e2.toString());
-                    }
-                } else {
-                    Log.d("SubwayFile", "No root available");
-                }
+            } else {
+                Log.d("SubwayFile", "No root available");
             }
 
             publishProgress("Preparing display...");
@@ -139,6 +135,53 @@ public class EditActivity extends AppCompatActivity {
                     row.addView(edit);
 
                     views.put(i, edit);
+
+                    table.addView(row);
+                }
+
+                TableRow heading = new TableRow(context);
+                TextView heading_label= new TextView(context);
+                heading_label.setText("Numerical settings");
+                heading_label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+                heading.addView(heading_label);
+                table.addView(heading);
+
+                numbers1_views = new HashMap<>();
+                for (int i=0; i<file.getNumbers1Size(); i++) {
+                    TableRow row = new TableRow(context);
+
+                    TextView label  = new TextView(context);
+                    label.setText(file.getNumbers1Key(i));
+                    label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+                    row.addView(label);
+
+                    EditText edit = new EditText(context);
+                    edit.setText(Integer.toString(file.getNumbers1Value(i)));
+                    edit.setLines(1);
+                    edit.setSingleLine();
+                    row.addView(edit);
+
+                    numbers1_views.put(i, edit);
+
+                    table.addView(row);
+                }
+
+                numbers2_views = new HashMap<>();
+                for (int i=0; i<file.getNumbers1Size(); i++) {
+                    TableRow row = new TableRow(context);
+
+                    TextView label  = new TextView(context);
+                    label.setText(file.getNumbers2Key(i));
+                    label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+                    row.addView(label);
+
+                    EditText edit = new EditText(context);
+                    edit.setText(Integer.toString(file.getNumbers2Value(i)));
+                    edit.setLines(1);
+                    edit.setSingleLine();
+                    row.addView(edit);
+
+                    numbers2_views.put(i, edit);
 
                     table.addView(row);
                 }
@@ -191,6 +234,16 @@ public class EditActivity extends AppCompatActivity {
         if (views != null) {
             for (int i: views.keySet()) {
                 file.setValue(i, views.get(i).getText().toString());
+            }
+        }
+        if (numbers1_views != null) {
+            for (int i: numbers1_views.keySet()) {
+                file.setNumbers1Value(i, Integer.parseInt(numbers1_views.get(i).getText().toString()));
+            }
+        }
+        if (numbers2_views != null) {
+            for (int i: numbers2_views.keySet()) {
+                file.setNumbers2Value(i, Integer.parseInt(numbers2_views.get(i).getText().toString()));
             }
         }
         new SaveSettings().execute();
