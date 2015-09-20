@@ -121,6 +121,7 @@ public class SubwayFile {
 
     protected void readFile(String filename) throws IOException
     {
+        Log.d("SubwayFile", "Reading settings from \"" + filename + "\"");
         BufferedInputStream in = new BufferedInputStream(new FileInputStream(filename));
 
         int hashSize = readDword(in);

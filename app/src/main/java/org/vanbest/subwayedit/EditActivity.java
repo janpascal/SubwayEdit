@@ -52,7 +52,8 @@ public class EditActivity extends AppCompatActivity {
         protected String doInBackground(String... params) {
             file = null;
             // publishProgress("Please wait...");
-            Log.d("SubwayFile", "Data file:" + localFilename);
+            Log.d("SubwayFile", "Original data file:" + filename);
+            Log.d("SubwayFile", "Local data file:" + localFilename);
 
             publishProgress("Getting root access...");
             try {
@@ -70,10 +71,21 @@ public class EditActivity extends AppCompatActivity {
                 // suVersion = Shell.SU.version(false);
                 // suVersionInternal = Shell.SU.version(true);
                 // publishProgress("Copying file...");
+                Log.d("SubwayEdit", "Running su to copy player data file");
+                Log.d("SubwayEdit", "dataDir: " + getApplicationInfo().dataDir);
                 List<String> suResult = Shell.SU.run(new String[] {
-                        "cp " + filename + " " + localFilename,
+                        "ls -ln " + filename,
+                        "echo 1:",
+                        "cat \"" + filename + "\" >\"" + localFilename + "\"",
+                        "echo 2:",
                         "chmod 0666 " + localFilename,
-                        "ls -ln " + filename
+                        "echo 3:",
+                        "ls -ln " + filename,
+                        "echo 4:",
+                        "ls -al " + localFilename,
+                        "echo 5:",
+                        "ls -al " + getApplicationInfo().dataDir,
+                        "echo 6"
                 });
                 Log.d("SubwayFile", "Su result: ");
                 for(String s: suResult) {
@@ -92,6 +104,7 @@ public class EditActivity extends AppCompatActivity {
                 }
                 publishProgress("Parsing settings file...");
                 try {
+                    Log.d("SubwayEdit", "CreatingSubwayFile object");
                     file = new SubwayFile(localFilename);
                 } catch (IOException e2) {
                     Log.d("SubwayFile", e2.toString());
@@ -208,7 +221,7 @@ public class EditActivity extends AppCompatActivity {
 
             boolean suAvailable = Shell.SU.available();
             List<String> suResult2 = Shell.SU.run(new String[]{
-                    "cp " + localFilename + " " + filename,
+                    "cat \"" + localFilename + "\" > \"" + filename + "\"",
                     "ls -l " + filename,
                     "chmod 0600 " + filename,
                     fileOwnerInfo == null ? "echo no" : "chown " + fileOwnerInfo + " " + filename,
