@@ -73,7 +73,7 @@ public class EditActivity extends AppCompatActivity {
                 // publishProgress("Copying file...");
                 Log.d("SubwayEdit", "Running su to copy player data file");
                 Log.d("SubwayEdit", "dataDir: " + getApplicationInfo().dataDir);
-                List<String> suResult = Shell.SU.run(new String[] {
+                String[] commands = new String[] {
                         "ls -ln " + filename,
                         "echo 1:",
                         "cat \"" + filename + "\" >\"" + localFilename + "\"",
@@ -84,12 +84,23 @@ public class EditActivity extends AppCompatActivity {
                         "echo 4:",
                         "ls -al " + localFilename,
                         "echo 5:",
-                        "ls -al " + getApplicationInfo().dataDir,
-                        "echo 6"
-                });
+                        "chown 10185:10185 " + localFilename,
+                        "echo 6:",
+                        "chmod a+rw " + localFilename,
+                        "echo 7:",
+                        "chcon \"u:object_r:app_data_file:s0:c512,c768\" " + localFilename, // SELinux black magic
+                        "echo 8:",
+                        "ls -alZ " + getApplicationInfo().dataDir,
+                        "echo 9"
+                };
+                Log.d("SubwayFile", "Running commands: ");
+                for(String s: commands) {
+                    Log.d("SubwayFile", "   " + s);
+                }
+                List<String> suResult = Shell.SU.run(commands);
                 Log.d("SubwayFile", "Su result: ");
                 for(String s: suResult) {
-                    Log.d("SubwayFile", s);
+                    Log.d("SubwayFile", "   " + s);
                 }
                 if (suResult.size()>0) {
                     Log.d("SubwayFile", "String to match: [" + suResult.get(0) + "]");
